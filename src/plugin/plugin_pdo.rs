@@ -57,6 +57,7 @@ impl Plugin for PdoPlugin {
         match (class_name, function_name) {
             (Some("PDO"), "__construct") => Some(self.hook_pdo_construct()),
             (Some("PDOStatement"), "__construct") => Some(self.hook_pdo_statement_construct()),
+            (Some("Doctrine\\DBAL\\Driver\\PDOStatement"), "__construct") => Some(self.hook_pdo_statement_construct()),
             (Some("PDO"), f)
                 if [
                     "exec",
