@@ -41,7 +41,7 @@ pub struct PdoPlugin;
 
 impl Plugin for PdoPlugin {
     fn class_names(&self) -> Option<&'static [&'static str]> {
-        Some(&["PDO", "PDOStatement"])
+        Some(&["PDO", "PDOStatement", "Doctrine\\DBAL\\Driver\\PDOStatement"])
     }
 
     fn function_name_prefix(&self) -> Option<&'static str> {
