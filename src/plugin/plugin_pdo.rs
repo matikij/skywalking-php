@@ -91,7 +91,7 @@ impl PdoPlugin {
 
                 let dsn = execute_data.get_parameter(0);
                 let dsn = dsn.as_z_str().context("dsn isn't str")?.to_str()?;
-                debug!(dsn, "construct PDO");
+                debug!(dsn, handle, "construct PDO");
 
                 let dsn: Dsn = dsn.parse()?;
                 debug!(?dsn, "parse PDO dsn");
@@ -198,6 +198,7 @@ fn after_hook(
             );
         }
     } else if let Some(obj) = return_value.as_mut_z_obj() {
+        debug!(return_value, obj.get_class().get_name(), "after_hook");
         if obj.get_class().get_name() == &"PDOStatement" {
             return after_hook_when_pdo_statement(get_this_mut(execute_data)?, obj);
         }
@@ -236,6 +237,7 @@ fn after_hook_when_pdo_statement(pdo: &mut ZObj, pdo_statement: &mut ZObj) -> cr
         .map(|r| r.value().clone())
         .context("DSN not found")?;
     DSN_MAP.insert(pdo_statement.handle(), dsn);
+    debug!(dsn, pdo_statement.handle(), "construct PDO");
     hack_dtor(pdo_statement, Some(pdo_statement_dtor));
     Ok(())
 }
