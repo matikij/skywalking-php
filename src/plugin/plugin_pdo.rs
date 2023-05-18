@@ -56,6 +56,7 @@ impl Plugin for PdoPlugin {
     )> {
         match (class_name, function_name) {
             (Some("PDO"), "__construct") => Some(self.hook_pdo_construct()),
+            (Some("PDOStatement"), "__construct") => Some(self.hook_pdo_statement_construct()),
             (Some("PDO"), f)
                 if [
                     "exec",
@@ -91,10 +92,35 @@ impl PdoPlugin {
 
                 let dsn = execute_data.get_parameter(0);
                 let dsn = dsn.as_z_str().context("dsn isn't str")?.to_str()?;
-                debug!(dsn, "construct PDO");
+                debug!(dsn, handle, "construct PDO");
 
                 let dsn: Dsn = dsn.parse()?;
                 debug!(?dsn, "parse PDO dsn");
+
+                DSN_MAP.insert(handle, dsn);
+
+                Ok(Box::new(()))
+            }),
+            Noop::noop(),
+        )
+    }
+
+    fn hook_pdo_statement_construct(&self) -> (Box<BeforeExecuteHook>, Box<AfterExecuteHook>) {
+        (
+            Box::new(|_, execute_data| {
+                validate_num_args(execute_data, 1)?;
+
+                let pdo_statement = get_this_mut(execute_data)?;
+                let handle = pdo_statement.handle();
+                hack_dtor(pdo_statement, Some(pdo_statement_dtor));
+
+                let pdo = execute_data.get_parameter(0);
+                let pdo = pdo.as_z_obj().context("pdo isn't ZObj")?;
+                let dsn = DSN_MAP
+                    .get(&pdo.handle())
+                    .map(|r| r.value().clone())
+                    .context("DSN not found")?;
+                debug!(?dsn, handle, "construct PDOStatement");
 
                 DSN_MAP.insert(handle, dsn);
 
@@ -197,10 +223,6 @@ fn after_hook(
                 &mut span.downcast::<Span>().unwrap(),
             );
         }
-    } else if let Some(obj) = return_value.as_mut_z_obj() {
-        if obj.get_class().get_name() == &"PDOStatement" {
-            return after_hook_when_pdo_statement(get_this_mut(execute_data)?, obj);
-        }
     }
 
     Ok(())
@@ -227,16 +249,6 @@ fn after_hook_when_false(this: &mut ZObj, span: &mut Span) -> crate::Result<()> 
     span_object.is_error = true;
     span_object.add_log([("SQLSTATE", state), ("Error Code", code), ("Error", error)]);
 
-    Ok(())
-}
-
-fn after_hook_when_pdo_statement(pdo: &mut ZObj, pdo_statement: &mut ZObj) -> crate::Result<()> {
-    let dsn = DSN_MAP
-        .get(&pdo.handle())
-        .map(|r| r.value().clone())
-        .context("DSN not found")?;
-    DSN_MAP.insert(pdo_statement.handle(), dsn);
-    hack_dtor(pdo_statement, Some(pdo_statement_dtor));
     Ok(())
 }
 
